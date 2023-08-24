@@ -57,6 +57,7 @@ type (
 		Addr  string
 		Type  string
 		Pass  string
+		Db    int
 		tls   bool
 		brk   breaker.Breaker
 		hooks []red.Hook
@@ -116,6 +117,9 @@ func NewRedis(conf RedisConf, opts ...Option) (*Redis, error) {
 	}
 	if len(conf.Pass) > 0 {
 		opts = append([]Option{WithPass(conf.Pass)}, opts...)
+	}
+	if conf.Db > 0 {
+		opts = append([]Option{WithDb(conf.Db)}, opts...)
 	}
 	if conf.Tls {
 		opts = append([]Option{WithTLS()}, opts...)
@@ -2844,6 +2848,13 @@ func Cluster() Option {
 // SetSlowThreshold sets the slow threshold.
 func SetSlowThreshold(threshold time.Duration) {
 	slowThreshold.Set(threshold)
+}
+
+// WithDb customizes the given Redis with given db.
+func WithDb(db int) Option {
+	return func(r *Redis) {
+		r.Db = db
+	}
 }
 
 // WithPass customizes the given Redis with given password.
