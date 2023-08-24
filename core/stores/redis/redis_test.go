@@ -102,6 +102,16 @@ func TestNewRedis(t *testing.T) {
 			ok: true,
 		},
 		{
+			name: "db",
+			RedisConf: RedisConf{
+				Host: r1.Addr(),
+				Type: NodeType,
+				Pass: "",
+				Db:   1,
+			},
+			ok: true,
+		},
+		{
 			name: "tls",
 			RedisConf: RedisConf{
 				Host: r1.Addr(),
@@ -1990,6 +2000,58 @@ func TestRedisGeo(t *testing.T) {
 	})
 }
 
+func TestRedisDb(t *testing.T) {
+	s := miniredis.RunT(t)
+
+	// db 1
+	client := MustNewRedis(RedisConf{
+		Host: s.Addr(),
+		Db:   1,
+		Type: NodeType,
+	})
+	assert.Equal(t, 1, client.Db)
+	assert.True(t, client.Ping())
+	err := client.Set("key", "value")
+	assert.Nil(t, err)
+	val, err := client.Get("key")
+	assert.Nil(t, err)
+	assert.Equal(t, "value", val)
+
+	// db 0
+	client = MustNewRedis(RedisConf{
+		Host: s.Addr(),
+		Type: NodeType,
+	})
+	assert.Equal(t, 0, client.Db)
+	assert.True(t, client.Ping())
+	val, err = client.Get("key")
+	assert.Nil(t, err)
+	assert.Equal(t, "", val)
+
+	err = client.Set("key2", "value2")
+	assert.Nil(t, err)
+	val, err = client.Get("key2")
+	assert.Nil(t, err)
+	assert.Equal(t, "value2", val)
+
+	// db 1
+	client = MustNewRedis(RedisConf{
+		Host: s.Addr(),
+		Db:   1,
+		Type: NodeType,
+	})
+	client.Ping()
+	_, err = client.Get("key")
+	assert.Nil(t, err)
+	val, err = client.Get("key")
+	assert.Nil(t, err)
+	assert.Equal(t, "value", val)
+
+	val, err = client.Get("key2")
+	assert.Nil(t, err)
+	assert.Equal(t, "", val)
+}
+
 func TestSetSlowThreshold(t *testing.T) {
 	assert.Equal(t, defaultSlowThreshold, slowThreshold.Load())
 	SetSlowThreshold(time.Second)
@@ -2019,12 +2081,31 @@ func TestRedis_checkConnection(t *testing.T) {
 	})
 }
 
+func TestRedis_WithDb(t *testing.T) {
+	runOnRedisDb(t, 1, func(client *Redis) {
+		err := client.Ping()
+		assert.NotNil(t, err)
+		assert.Equal(t, client.Db, 1)
+	})
+}
+
 func runOnRedis(t *testing.T, fn func(client *Redis)) {
 	logx.Disable()
 
 	s := miniredis.RunT(t)
 	fn(MustNewRedis(RedisConf{
 		Host: s.Addr(),
+		Type: NodeType,
+	}))
+}
+
+func runOnRedisDb(t *testing.T, db int, fn func(client *Redis)) {
+	logx.Disable()
+
+	s := miniredis.RunT(t)
+	fn(MustNewRedis(RedisConf{
+		Host: s.Addr(),
+		Db:   db,
 		Type: NodeType,
 	}))
 }
